@@ -1,6 +1,6 @@
 //go:build !embed
 
-package webapp
+package static
 
 import (
 	"net/http"
@@ -8,11 +8,10 @@ import (
 	"net/url"
 
 	"github.com/euiko/webapp/pkg/log"
-	"github.com/euiko/webapp/settings"
 	"github.com/go-chi/chi/v5"
 )
 
-func createStaticRoutes(r chi.Router, s *settings.StaticServer) {
+func createStaticRoutes(r chi.Router, s *Settings) {
 	url, err := url.Parse(s.Proxy.Upstream)
 	if err != nil {
 		log.Fatal("invalid target", log.WithField("target", s.Proxy.Upstream))

@@ -1,18 +1,22 @@
 package settings
 
 import (
+	"encoding/json"
+	"errors"
+	"fmt"
+	"io"
 	"time"
 
-	"github.com/spf13/viper"
+	"github.com/go-yaml/yaml"
+	"github.com/mitchellh/mapstructure"
 )
 
 type (
 	Settings struct {
-		Log          Log          `mapstructure:"log"`
-		Server       Server       `mapstructure:"server"`
-		StaticServer StaticServer `mapstructure:"static_server"`
-		DB           Database     `mapstructure:"db"`
-		Extra        *viper.Viper `mapstructure:"extra"`
+		Log    Log            `mapstructure:"log"`
+		Server Server         `mapstructure:"server"`
+		DB     Database       `mapstructure:"db"`
+		Extra  map[string]any `mapstructure:"extra"`
 	}
 
 	Log struct {
@@ -24,22 +28,8 @@ type (
 		ReadTimeout  time.Duration `mapstructure:"read_timeout"`
 		WriteTimeout time.Duration `mapstructure:"write_timeout"`
 		IdleTimeout  time.Duration `mapstructure:"idle_timeout"`
+		ApiPrefix    string        `mapstructure:"api_prefix"`
 		// TODO: add https support
-	}
-
-	StaticServer struct {
-		Enabled bool        `mapstructure:"enabled"`
-		Embed   StaticEmbed `mapstructure:"embed"`
-		Proxy   StaticProxy `mapstructure:"proxy"`
-	}
-
-	StaticEmbed struct {
-		IndexPath string `mapstructure:"index_path"`
-		UseMPA    bool   `mapstructure:"use_mpa"`
-	}
-
-	StaticProxy struct {
-		Upstream string `mapstructure:"upstream"`
 	}
 
 	Database struct {
@@ -60,10 +50,21 @@ type (
 		MaxOpenConns    int           `mapstructure:"max_open_conns"`
 		UseORM          bool          `mapstructure:"use_orm"`
 	}
+
+	Format int
 )
 
-func DefaultSettings() Settings {
-	// default settings
+const (
+	FormatYaml = iota
+	FormatJson
+)
+
+var (
+	ErrKeyNotFound    = errors.New("key not found")
+	ErrMismatchedType = errors.New("type mismatch")
+)
+
+func New() Settings {
 	return Settings{
 		Log: Log{
 			Level: "info",
@@ -73,17 +74,8 @@ func DefaultSettings() Settings {
 			ReadTimeout:  60 * time.Second,
 			WriteTimeout: 60 * time.Second,
 			IdleTimeout:  0,
+			ApiPrefix:    "/api",
 			// TODO: add https support
-		},
-		StaticServer: StaticServer{
-			Enabled: true,
-			Embed: StaticEmbed{
-				IndexPath: "index.html",
-				UseMPA:    false,
-			},
-			Proxy: StaticProxy{
-				Upstream: "http://localhost:5173",
-			},
 		},
 		DB: Database{
 			Sql: SqlDatabase{
@@ -98,6 +90,51 @@ func DefaultSettings() Settings {
 				Sql: make(map[string]SqlDatabase),
 			},
 		},
-		Extra: nil,
+		Extra: make(map[string]any),
 	}
+}
+
+func GetExtra[T any](s *Settings, key string) (*T, error) {
+	extra, ok := s.Extra[key]
+	if !ok {
+		return nil, ErrKeyNotFound
+	}
+
+	switch v := extra.(type) {
+	case *T:
+		return v, nil
+	case T:
+		return &v, nil
+	default:
+		return nil, ErrMismatchedType
+	}
+}
+
+func Write(s *Settings, format Format, w io.Writer) error {
+	var (
+		mapCoded = make(map[string]any)
+		encoded  []byte
+		err      error
+	)
+
+	// convert into map
+	if err := mapstructure.Decode(s, &mapCoded); err != nil {
+		return err
+	}
+
+	switch format {
+	case FormatYaml:
+		encoded, err = yaml.Marshal(mapCoded)
+	case FormatJson:
+		encoded, err = json.Marshal(mapCoded)
+	default:
+		return fmt.Errorf("unsupported format: %d", format)
+	}
+
+	if err != nil {
+		return err
+	}
+
+	_, err = w.Write(encoded)
+	return err
 }

@@ -3,8 +3,9 @@
 An opinionated Go fullstack framework with batteries included.
 
 ## Features
-- [x] UI (Vue 3)
-- [x] Configuration
+- [x] CLI
+  - [x] Migration
+  - [x] Config Helper
 - [x] Logging
 - [x] Embed static files
 - [x] Modular architecture
@@ -18,7 +19,7 @@ An opinionated Go fullstack framework with batteries included.
 - [ ] WebSocket
 - [ ] Email
 - [ ] Built-in Modules
-    - [ ] Static File (to serve frontend assets)
+    - [x] Static File (to serve frontend assets)
     - [ ] Authentication
     - [ ] User Management
     - [ ] Role Management
@@ -32,5 +33,4 @@ An opinionated Go fullstack framework with batteries included.
   - [ ] NoSQL
   - [ ] Key-Value
   - [ ] etc.
-- [x] Migration
 - [ ] Testing

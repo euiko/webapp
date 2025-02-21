@@ -1,6 +1,6 @@
 //go:build embed
 
-package webapp
+package static
 
 import (
 	"embed"
@@ -8,11 +8,10 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/euiko/webapp/settings"
 	"github.com/go-chi/chi/v5"
 )
 
-var StaticFS embed.FS
+var EmbedFS embed.FS
 
 type subFS struct {
 	path string
@@ -24,11 +23,11 @@ func (s subFS) Open(name string) (fs.File, error) {
 	return s.fs.Open(s.path + "/" + name)
 }
 
-func createStaticRoutes(r chi.Router, s *settings.StaticServer) {
-	staticFs := newSubFS(StaticFS, "ui/dist")
+func createStaticRoutes(r chi.Router, s *Settings) {
+	embedFs := newSubFS(EmbedFS, "ui/dist")
 
-	// serve other files from the embedded StaticFS
-	entries, _ := StaticFS.ReadDir("ui/dist")
+	// serve other files from the embedded EmbedFS
+	entries, _ := EmbedFS.ReadDir("ui/dist")
 	for _, entry := range entries {
 		// skip index.html
 		if entry.Name() == s.Embed.IndexPath {
@@ -36,13 +35,13 @@ func createStaticRoutes(r chi.Router, s *settings.StaticServer) {
 		}
 
 		// use absolute route and staticfs for files
-		fs := staticFs
+		fs := embedFs
 		route := "/" + entry.Name()
 
 		// use wildcard route and subfs for directories
 		if entry.IsDir() {
 			route = "/" + entry.Name() + "/*"
-			fs = newSubFS(staticFs, entry.Name())
+			fs = newSubFS(embedFs, entry.Name())
 		}
 
 		// register route
@@ -63,7 +62,7 @@ func createStaticRoutes(r chi.Router, s *settings.StaticServer) {
 	// serve index.html from embedded static
 	if !s.Embed.UseMPA {
 		r.Get("/*", func(w http.ResponseWriter, r *http.Request) {
-			http.ServeFileFS(w, r, staticFs, s.Embed.IndexPath)
+			http.ServeFileFS(w, r, embedFs, s.Embed.IndexPath)
 		})
 	}
 }

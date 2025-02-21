@@ -1,0 +1,38 @@
+{
+  "Log": {
+    "Level": "info"
+  },
+  "Server": {
+    "Addr": ":8080",
+    "ReadTimeout": 60000000000,
+    "WriteTimeout": 60000000000,
+    "IdleTimeout": 0,
+    "ApiPrefix": "/api"
+  },
+  "DB": {
+    "Sql": {
+      "Enabled": false,
+      "Driver": "pgx",
+      "Uri": "postgres://postgres:12345678@localhost:5432/postgres?sslmode=disable",
+      "ConnMaxLifetime": 60000000000,
+      "MaxIdleConns": 10,
+      "MaxOpenConns": 10,
+      "UseORM": false
+    },
+    "Extra": {
+      "Sql": {}
+    }
+  },
+  "Extra": {
+    "static_server": {
+      "Enabled": true,
+      "Embed": {
+        "IndexPath": "index.html",
+        "UseMPA": false
+      },
+      "Proxy": {
+        "Upstream": "http://localhost:5173"
+      }
+    }
+  }
+}
