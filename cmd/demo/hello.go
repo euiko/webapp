@@ -8,9 +8,9 @@ import (
 	"github.com/go-chi/chi/v5"
 )
 
-func newHelloService(s *settings.Settings) api.Module {
+func newHelloService() api.Module {
 	return api.NewModule(
-		api.ModuleWithAPIService(func(r chi.Router) {
+		api.ModuleWithAPIService(func(r chi.Router, _ *settings.Settings) {
 			r.Get("/hello", func(w http.ResponseWriter, r *http.Request) {
 				w.WriteHeader(http.StatusOK)
 				w.Write([]byte("hello world!"))

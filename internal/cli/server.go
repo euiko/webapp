@@ -6,9 +6,9 @@ import (
 	"github.com/spf13/cobra"
 )
 
-func Server(app api.App) func(settings *settings.Settings) api.Module {
-	return func(settings *settings.Settings) api.Module {
-		return api.NewModule(api.ModuleWithCLI(func(cmd *cobra.Command) {
+func Server(app api.App) api.ModuleFactory {
+	return func() api.Module {
+		return api.NewModule(api.ModuleWithCLI(func(cmd *cobra.Command, _ *settings.Settings) {
 			startCmd := cobra.Command{
 				Use:   "start",
 				Short: "Start the web application",

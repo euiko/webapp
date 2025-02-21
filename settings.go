@@ -4,31 +4,34 @@ import (
 	"os"
 	"path"
 
-	"github.com/euiko/webapp/settings"
+	"github.com/euiko/webapp/api"
 	"github.com/spf13/viper"
 )
 
-func loadSettings(name string, shortName string) settings.Settings {
-	s := settings.DefaultSettings()
-
+func (a *App) loadSettings() *viper.Viper {
 	// use viper for configuration
 	v := viper.New()
-	v.SetConfigName(name)
+	v.SetConfigName(a.name)
 	v.AddConfigPath(".")
 
 	// use short name as env prefix if it is defined
-	if shortName != "" {
-		v.SetEnvPrefix(shortName)
+	if a.shortName != "" {
+		v.SetEnvPrefix(a.shortName)
 	}
 
 	// add config in home directory is it is defined
 	homeDir := os.Getenv("HOME")
 	if homeDir != "" {
 		v.AddConfigPath(homeDir)
-		v.AddConfigPath(path.Join(homeDir, ".config", name))
+		v.AddConfigPath(path.Join(homeDir, ".config", a.name))
 	}
 
-	// load settings
-	v.Unmarshal(&s)
-	return s
+	// settings loader to configure default settings
+	for _, module := range a.modules {
+		if loader, ok := module.(api.SettingsLoader); ok {
+			loader.DefaultSettings(&a.settings)
+		}
+	}
+
+	return v
 }

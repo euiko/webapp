@@ -2,6 +2,7 @@ package webapp
 
 import (
 	"context"
+	"encoding/json"
 	"net/http"
 	"os"
 	"time"
@@ -20,7 +21,7 @@ type (
 	App struct {
 		name      string
 		shortName string
-		settings  *settings.Settings
+		settings  settings.Settings
 
 		registry           []api.ModuleFactory
 		modules            []api.Module
@@ -42,9 +43,9 @@ func New(name string, shortName string, opts ...Option) *App {
 	app := App{
 		name:               name,
 		shortName:          shortName,
-		settings:           nil,
 		modules:            []api.Module{},
 		defaultMiddlewares: []Middleware{},
+		settings:           settings.New(),
 	}
 
 	// apply options
@@ -65,19 +66,30 @@ func (a *App) Register(f api.ModuleFactory) {
 
 // Run the app
 func (a *App) Run(ctx context.Context) error {
-	// load settings
-	settings := loadSettings(a.name, a.shortName)
-	a.settings = &settings
-
-	// initialize logger
-	initializeLogger(settings.Log)
-
-	// create and initialize modules
-	log.Trace("initializing modules...")
+	// instantiate modules
+	log.Trace("instantiating modules...")
 	a.modules = make([]api.Module, len(a.registry))
 	for i, factory := range a.registry {
-		a.modules[i] = factory(&settings)
-		a.modules[i].Init(ctx)
+		a.modules[i] = factory()
+	}
+
+	// load settings
+	// TODO: handle error when unmarshaling
+	loader := a.loadSettings()
+	_ = loader.Unmarshal(&a.settings)
+
+	encoded, _ := json.MarshalIndent(a.settings, "", "  ")
+	f, _ := os.OpenFile("settings.json", os.O_CREATE|os.O_WRONLY, 0644)
+	defer f.Close()
+	f.Write(encoded)
+
+	// initialize logger
+	initializeLogger(a.settings.Log)
+
+	// initialize modules
+	log.Trace("initializing modules...")
+	for _, module := range a.modules {
+		module.Init(ctx, &a.settings)
 	}
 
 	rootCmd := a.initializeCli()
@@ -155,13 +167,16 @@ func (a *App) createServer() http.Server {
 		router.Use(middleware)
 	}
 
-	// register static routes
-	if a.settings.StaticServer.Enabled {
-		createStaticRoutes(router, &a.settings.StaticServer)
+	// register routes
+	for _, module := range a.modules {
+		// register routes
+		if service, ok := module.(api.Service); ok {
+			service.Route(router)
+		}
 	}
 
-	// register routes
-	router.Route("/api", func(r chi.Router) {
+	// register api routes
+	router.Route(a.settings.Server.ApiPrefix, func(r chi.Router) {
 		for _, module := range a.modules {
 			// register routes
 			if service, ok := module.(api.APIService); ok {
@@ -185,6 +200,7 @@ func (a *App) builtInModules() []api.ModuleFactory {
 	return []api.ModuleFactory{
 		cli.Server(a),
 		cli.Migration,
+		cli.Config,
 	}
 }
 

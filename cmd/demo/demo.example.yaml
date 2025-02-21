@@ -1,0 +1,27 @@
+db:
+  extra:
+    sql: {}
+  sql:
+    conn_max_lifetime: 1m0s
+    driver: pgx
+    enabled: false
+    max_idle_conns: 10
+    max_open_conns: 10
+    uri: postgres://postgres:12345678@localhost:5432/postgres?sslmode=disable
+    use_orm: false
+extra:
+  static_server:
+    enabled: true
+    embed:
+      indexpath: index.html
+      usempa: false
+    proxy:
+      upstream: http://localhost:5173
+log:
+  level: info
+server:
+  addr: :8080
+  api_prefix: /api
+  idle_timeout: 0s
+  read_timeout: 1m0s
+  write_timeout: 1m0s

@@ -26,8 +26,8 @@ var (
 	regex         = regexp.MustCompile(`[^a-zA-Z0-9_]+`)
 )
 
-func Migration(s *settings.Settings) api.Module {
-	return api.NewModule(api.ModuleWithCLI(func(cmd *cobra.Command) {
+func Migration() api.Module {
+	return api.NewModule(api.ModuleWithCLI(func(cmd *cobra.Command, s *settings.Settings) {
 		cmd.AddCommand(migrationCmd(s))
 	}))
 }
