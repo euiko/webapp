@@ -2,13 +2,12 @@ db:
   extra:
     sql: {}
   sql:
-    conn_max_lifetime: 1m0s
+    enabled: true
     driver: pgx
-    enabled: false
+    conn_max_lifetime: 1m0s
     max_idle_conns: 10
     max_open_conns: 10
-    uri: postgres://postgres:12345678@localhost:5432/postgres?sslmode=disable
-    use_orm: false
+    uri: postgres://demo:12345678@localhost:15432/demo?sslmode=disable
 extra:
   static_server:
     enabled: true

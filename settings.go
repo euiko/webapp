@@ -1,14 +1,18 @@
 package webapp
 
 import (
+	"errors"
 	"os"
 	"path"
 
 	"github.com/euiko/webapp/api"
+	"github.com/euiko/webapp/pkg/log"
 	"github.com/spf13/viper"
 )
 
-func (a *App) loadSettings() *viper.Viper {
+var ErrConfigNotFound = errors.New("config not found")
+
+func (a *App) loadSettings() (Unmarshaler, error) {
 	// use viper for configuration
 	v := viper.New()
 	v.SetConfigName(a.name)
@@ -33,5 +37,18 @@ func (a *App) loadSettings() *viper.Viper {
 		}
 	}
 
-	return v
+	if err := v.ReadInConfig(); err != nil {
+		if _, ok := err.(viper.ConfigFileNotFoundError); ok {
+			log.Info("configuration file not found, use default settings",
+				log.WithError(err),
+			)
+			return nil, ErrConfigNotFound
+		}
+
+		return nil, err
+	}
+
+	return UnmarshalerFunc(func(dst any) error {
+		return v.Unmarshal(dst)
+	}), nil
 }

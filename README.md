@@ -6,6 +6,10 @@ An opinionated Go fullstack framework with batteries included.
 - [x] CLI
   - [x] Migration
   - [x] Config Helper
+- [ ] Server
+  - [ ] HTTP
+  - [ ] SSL/TLS
+  - [ ] Websocket
 - [x] Logging
 - [x] Embed static files
 - [x] Modular architecture
@@ -16,14 +20,12 @@ An opinionated Go fullstack framework with batteries included.
   - [ ] etc.
 - [ ] Job Queue
   - [ ] Beanstalkd
-- [ ] WebSocket
 - [ ] Email
+- [ ] Stream/IO Processing
 - [ ] Built-in Modules
     - [x] Static File (to serve frontend assets)
     - [ ] Authentication
-    - [ ] User Management
-    - [ ] Role Management
-    - [ ] Permission Management
+    - [ ] RBAC
     - [ ] Audit Log
     - [ ] File Storage
     - [ ] etc.

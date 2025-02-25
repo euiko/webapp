@@ -11,13 +11,13 @@ import (
 	"github.com/spf13/cobra"
 )
 
-func Config() api.Module {
+func Settings() api.Module {
 	return api.NewModule(api.ModuleWithCLI(func(cmd *cobra.Command, s *settings.Settings) {
 		cmd.AddCommand(configCmd(s))
 	}))
 }
 
-var configWriter = map[string]func(*settings.Settings, io.Writer) error{
+var settingsWriter = map[string]func(*settings.Settings, io.Writer) error{
 	"yaml": func(s *settings.Settings, w io.Writer) error {
 		return settings.Write(s, settings.FormatYaml, w)
 	},
@@ -28,21 +28,21 @@ var configWriter = map[string]func(*settings.Settings, io.Writer) error{
 
 func configCmd(s *settings.Settings) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "config",
-		Short: "Manage the configuration",
+		Use:   "settings",
+		Short: "Manage the app settings",
 	}
-	cmd.AddCommand(configGetCmd(s))
-	cmd.AddCommand(configWriteCmd(s))
+	cmd.AddCommand(settingsGetCmd(s))
+	cmd.AddCommand(settingsWriteCmd(s))
 	return cmd
 }
 
-func configGetCmd(s *settings.Settings) *cobra.Command {
+func settingsGetCmd(s *settings.Settings) *cobra.Command {
 	var format string
 	cmd := &cobra.Command{
 		Use:   "get",
-		Short: "Get the configuration",
+		Short: "Get the current settings",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			writer, ok := configWriter[format]
+			writer, ok := settingsWriter[format]
 			if !ok {
 				return fmt.Errorf("unsupported format: %s", format)
 			}
@@ -58,16 +58,16 @@ func configGetCmd(s *settings.Settings) *cobra.Command {
 	return cmd
 }
 
-func configWriteCmd(s *settings.Settings) *cobra.Command {
+func settingsWriteCmd(s *settings.Settings) *cobra.Command {
 	var (
 		format string
 		output string
 	)
 	cmd := &cobra.Command{
 		Use:   "write [FILE]",
-		Short: "Write the configuration",
+		Short: "Write the current settings to target",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			writer, ok := configWriter[format]
+			writer, ok := settingsWriter[format]
 			if !ok {
 				return fmt.Errorf("unsupported format: %s", format)
 			}

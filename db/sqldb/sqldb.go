@@ -6,14 +6,20 @@ import (
 
 	"github.com/euiko/webapp/pkg/log"
 	"github.com/euiko/webapp/settings"
+
+	_ "github.com/go-sql-driver/mysql"
+	_ "github.com/jackc/pgx/v5/stdlib"
+	_ "github.com/microsoft/go-mssqldb"
 )
 
 const defaultDbName = "default"
 
 var (
+	ErrAlreadyOpened = errors.New("database already opened")
+	ErrNotOpened     = errors.New("database not opened")
+
 	// for holds all the database connections
-	instances    = make(map[string]*sql.DB)
-	errNotOpened = errors.New("database not opened")
+	instances = make(map[string]*sql.DB)
 )
 
 // DB returns the selected database connection by its name, default to default connection
@@ -25,18 +31,18 @@ func DB(names ...string) *sql.DB {
 
 	// ensure the database is opened
 	if _, ok := instances[name]; !ok {
-		log.Error(errNotOpened.Error(),
+		log.Error("error while retrieving database connection",
 			log.WithField("name", name),
-			log.WithError(errNotOpened),
+			log.WithError(ErrNotOpened),
 		)
 		// exit early
-		panic(errNotOpened)
+		panic(ErrNotOpened)
 	}
 
 	return instances[name]
 }
 
-func Open(s settings.SqlDatabase, names ...string) error {
+func Open(s *settings.SqlDatabase, names ...string) error {
 	var (
 		name = defaultDbName
 	)
@@ -53,7 +59,7 @@ func Open(s settings.SqlDatabase, names ...string) error {
 
 	// ensure the database is not already opened
 	if _, ok := instances[name]; ok {
-		return errors.New("database already opened")
+		return ErrAlreadyOpened
 	}
 
 	// TODO: add gorm configurations
@@ -66,10 +72,11 @@ func Open(s settings.SqlDatabase, names ...string) error {
 	db.SetMaxOpenConns(s.MaxOpenConns)
 	db.SetConnMaxLifetime(s.ConnMaxLifetime)
 
-	if s.UseORM {
-		if err := initORM(name, &s, db); err != nil {
-			return err
-		}
+	err = initORM(name, s, db)
+	if err == ErrDialectNotSupported {
+		log.Info("database doesn't support ORM", log.WithField("name", name))
+	} else if err != nil && err != ErrDialectNotSupported {
+		return err
 	}
 
 	instances[name] = db
@@ -77,11 +84,17 @@ func Open(s settings.SqlDatabase, names ...string) error {
 }
 
 func Close() error {
-	var err error
+	// close ORM instances first
+	err := closeORM()
+	if err != nil {
+		return err
+	}
+
 	// keep try closes another db connection even when error
 	// and return the last errors
 	for name, db := range instances {
-		if e := db.Close(); e != nil {
+		// exclude ErrConnDone as it is possible already closed by ORM
+		if e := db.Close(); e != nil && e != sql.ErrConnDone {
 			log.Error("error when closing database",
 				log.WithField("name", name),
 				log.WithError(err))

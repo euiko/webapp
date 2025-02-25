@@ -48,7 +48,6 @@ type (
 		ConnMaxLifetime time.Duration `mapstructure:"conn_max_lifetime"`
 		MaxIdleConns    int           `mapstructure:"max_idle_conns"`
 		MaxOpenConns    int           `mapstructure:"max_open_conns"`
-		UseORM          bool          `mapstructure:"use_orm"`
 	}
 
 	Format int

@@ -1,0 +1,14 @@
+version: "3"
+services:
+  postgres:
+    image: postgres:17
+    environment:
+      POSTGRES_USER: demo
+      POSTGRES_PASSWORD: 12345678
+      POSTGRES_DB: demo
+    ports:
+      - "15432:5432"
+    volumes:
+      - postgres:/var/lib/postgresql/data
+volumes:
+  postgres:
