@@ -10,8 +10,10 @@ import (
 	"github.com/euiko/webapp/module/static"
 )
 
-//go:embed db/migrations
-var migrations embed.FS
+var (
+	//go:embed db/migrations
+	migrations embed.FS
+)
 
 func main() {
 	// register migrations
