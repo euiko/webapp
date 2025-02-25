@@ -6,14 +6,15 @@ import (
 
 	"github.com/euiko/webapp/pkg/log"
 	"github.com/euiko/webapp/settings"
-	"gorm.io/driver/mysql"
-	"gorm.io/driver/postgres"
-	"gorm.io/driver/sqlserver"
-	"gorm.io/gorm"
+	"github.com/uptrace/bun"
+	"github.com/uptrace/bun/dialect/mssqldialect"
+	"github.com/uptrace/bun/dialect/mysqldialect"
+	"github.com/uptrace/bun/dialect/pgdialect"
+	"github.com/uptrace/bun/schema"
 )
 
 type (
-	dialectFactory func(*settings.SqlDatabase, *sql.DB) gorm.Dialector
+	dialectFactory func(*settings.SqlDatabase) schema.Dialect
 )
 
 var (
@@ -21,16 +22,16 @@ var (
 	ErrDialectNotSupported  = errors.New("no dialect supported for the selected driver")
 
 	// for holds all the orm instances
-	ormInstances    = make(map[string]*gorm.DB)
+	ormInstances    = make(map[string]*bun.DB)
 	dialectRegistry = map[string]dialectFactory{
 		"postgres": newPostgresDialect,
 		"pgx":      newPostgresDialect,
 		"mysql":    newMysqlDialect,
-		"azuersql": newSqlServerDialect,
+		"mssql":    newSqlServerDialect,
 	}
 )
 
-func ORM(names ...string) *gorm.DB {
+func ORM(names ...string) *bun.DB {
 	name := defaultDbName
 	if len(names) > 0 {
 		name = names[0]
@@ -38,12 +39,12 @@ func ORM(names ...string) *gorm.DB {
 
 	// ensure the database is opened
 	if _, ok := ormInstances[name]; !ok {
-		log.Error(errNotOpened.Error(),
+		log.Error("error while retrieving ORM database instance",
 			log.WithField("name", name),
-			log.WithError(errNotOpened),
+			log.WithField("reason", "the database not yet opened or doesn't support ORM"),
 		)
 		// exit early
-		panic(errNotOpened)
+		panic(ErrNotOpened)
 	}
 
 	return ormInstances[name]
@@ -60,30 +61,37 @@ func RegisterORMDialect(name string, f dialectFactory) error {
 }
 
 func initORM(name string, s *settings.SqlDatabase, db *sql.DB) error {
-	var config gorm.Config
-
 	dialectFactory, ok := dialectRegistry[s.Driver]
 	if !ok {
 		return ErrDialectNotSupported
 	}
 
-	gormDb, err := gorm.Open(dialectFactory(s, db), &config)
-	if err != nil {
-		return err
-	}
-
-	ormInstances[name] = gormDb
+	ormInstances[name] = bun.NewDB(db, dialectFactory(s))
 	return nil
 }
 
-func newPostgresDialect(s *settings.SqlDatabase, db *sql.DB) gorm.Dialector {
-	return postgres.New(postgres.Config{Conn: db})
+func closeORM() error {
+	var err error
+	for name, db := range ormInstances {
+		if e := db.Close(); e != nil {
+			log.Error("error when closing orm database",
+				log.WithField("name", name),
+				log.WithError(err))
+			err = e // return the last error as errors
+		}
+	}
+
+	return err
 }
 
-func newMysqlDialect(s *settings.SqlDatabase, db *sql.DB) gorm.Dialector {
-	return mysql.New(mysql.Config{Conn: db})
+func newPostgresDialect(s *settings.SqlDatabase) schema.Dialect {
+	return pgdialect.New()
 }
 
-func newSqlServerDialect(s *settings.SqlDatabase, db *sql.DB) gorm.Dialector {
-	return sqlserver.New(sqlserver.Config{Conn: db})
+func newMysqlDialect(s *settings.SqlDatabase) schema.Dialect {
+	return mysqldialect.New()
+}
+
+func newSqlServerDialect(s *settings.SqlDatabase) schema.Dialect {
+	return mssqldialect.New()
 }

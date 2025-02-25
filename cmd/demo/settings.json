@@ -16,8 +16,7 @@
       "Uri": "postgres://postgres:12345678@localhost:5432/postgres?sslmode=disable",
       "ConnMaxLifetime": 60000000000,
       "MaxIdleConns": 10,
-      "MaxOpenConns": 10,
-      "UseORM": false
+      "MaxOpenConns": 10
     },
     "Extra": {
       "Sql": {}

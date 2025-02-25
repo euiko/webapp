@@ -2,16 +2,27 @@ package main
 
 import (
 	"context"
+	"embed"
+	"log"
 
 	"github.com/euiko/webapp"
+	"github.com/euiko/webapp/db/sqldb"
 	"github.com/euiko/webapp/module/static"
 )
 
+//go:embed db/migrations
+var migrations embed.FS
+
 func main() {
-	app := webapp.New("go-fullstack-boilerplate", "WEBAPP")
+	// register migrations
+	sqldb.AddMigrationFS(migrations)
+
+	app := webapp.New("demo", "WEBAPP_DEMO")
 
 	// Service modules
 	app.Register(static.NewModule)
 	app.Register(newHelloService)
-	app.Run(context.Background())
+	if err := app.Run(context.Background()); err != nil {
+		log.Fatal(err)
+	}
 }

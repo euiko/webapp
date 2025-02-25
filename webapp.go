@@ -2,7 +2,6 @@ package webapp
 
 import (
 	"context"
-	"encoding/json"
 	"net/http"
 	"os"
 	"time"
@@ -75,13 +74,16 @@ func (a *App) Run(ctx context.Context) error {
 
 	// load settings
 	// TODO: handle error when unmarshaling
-	loader := a.loadSettings()
-	_ = loader.Unmarshal(&a.settings)
+	unmarshaler, err := a.loadSettings()
+	if err != nil && err != ErrConfigNotFound {
+		return err
+	}
 
-	encoded, _ := json.MarshalIndent(a.settings, "", "  ")
-	f, _ := os.OpenFile("settings.json", os.O_CREATE|os.O_WRONLY, 0644)
-	defer f.Close()
-	f.Write(encoded)
+	if unmarshaler != nil {
+		if err := unmarshaler.Unmarshal(&a.settings); err != nil {
+			return err
+		}
+	}
 
 	// initialize logger
 	initializeLogger(a.settings.Log)
@@ -110,7 +112,7 @@ func (a *App) Start(ctx context.Context) error {
 	// create and initialize server
 	log.Info("starting the server...", log.WithField("addr", a.settings.Server.Addr))
 	server := a.createServer()
-	if err := db.Init(a.settings.DB); err != nil {
+	if err := db.Init(&a.settings.DB); err != nil {
 		return err
 	}
 
@@ -200,7 +202,7 @@ func (a *App) builtInModules() []api.ModuleFactory {
 	return []api.ModuleFactory{
 		cli.Server(a),
 		cli.Migration,
-		cli.Config,
+		cli.Settings,
 	}
 }
 
