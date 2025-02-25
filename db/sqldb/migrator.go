@@ -149,7 +149,7 @@ func (m *bunMigrator) Migrate(ctx context.Context, steps ...int) ([]string, erro
 			}
 		}
 
-		migrated = append(migrated, migration.Name)
+		migrated = append(migrated, migration.String())
 		lastGroupID = groupID
 	}
 
@@ -202,7 +202,7 @@ func (m *bunMigrator) Rollback(ctx context.Context, steps ...int) ([]string, err
 		}
 
 		// track the migrated migrations
-		migrated = append(migrated, migration.Name)
+		migrated = append(migrated, migration.String())
 		numMigrated++
 	}
 
