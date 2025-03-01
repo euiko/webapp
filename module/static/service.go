@@ -1,9 +1,12 @@
 package static
 
-import "github.com/go-chi/chi/v5"
+import (
+	"github.com/euiko/webapp/api"
+)
 
-func (m *Module) Route(router chi.Router) {
+func (m *Module) Route(router api.Router) {
 	if m.settings.Enabled {
-		createStaticRoutes(router, m.settings)
+		// create another router without auth middleware
+		createStaticRoutes(router, &m.settings)
 	}
 }

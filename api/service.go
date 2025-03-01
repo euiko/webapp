@@ -1,13 +1,11 @@
 package api
 
-import "github.com/go-chi/chi/v5"
-
 type (
 	Service interface {
-		Route(router chi.Router)
+		Route(router Router)
 	}
 
 	APIService interface {
-		APIRoute(router chi.Router)
+		APIRoute(router Router)
 	}
 )

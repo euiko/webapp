@@ -8,7 +8,7 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/go-chi/chi/v5"
+	"github.com/euiko/webapp/api"
 )
 
 var EmbedFS embed.FS
@@ -23,7 +23,7 @@ func (s subFS) Open(name string) (fs.File, error) {
 	return s.fs.Open(s.path + "/" + name)
 }
 
-func createStaticRoutes(r chi.Router, s *Settings) {
+func createStaticRoutes(r api.Router, s *Settings) {
 	embedFs := newSubFS(EmbedFS, "ui/dist")
 
 	// serve other files from the embedded EmbedFS

@@ -7,6 +7,7 @@ import (
 
 	"github.com/euiko/webapp"
 	"github.com/euiko/webapp/db/sqldb"
+	"github.com/euiko/webapp/module/auth"
 	"github.com/euiko/webapp/module/static"
 )
 
@@ -22,7 +23,8 @@ func main() {
 	app := webapp.New("demo", "WEBAPP_DEMO")
 
 	// Service modules
-	app.Register(static.NewModule)
+	app.Register(static.ModuleFactory())
+	app.Register(auth.ModuleFactory())
 	app.Register(newHelloService)
 	if err := app.Run(context.Background()); err != nil {
 		log.Fatal(err)

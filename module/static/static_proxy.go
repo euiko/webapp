@@ -7,11 +7,11 @@ import (
 	"net/http/httputil"
 	"net/url"
 
+	"github.com/euiko/webapp/api"
 	"github.com/euiko/webapp/pkg/log"
-	"github.com/go-chi/chi/v5"
 )
 
-func createStaticRoutes(r chi.Router, s *Settings) {
+func createStaticRoutes(r api.Router, s *Settings) {
 	url, err := url.Parse(s.Proxy.Upstream)
 	if err != nil {
 		log.Fatal("invalid target", log.WithField("target", s.Proxy.Upstream))
