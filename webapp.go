@@ -12,6 +12,7 @@ import (
 	"github.com/euiko/webapp/pkg/log"
 	"github.com/euiko/webapp/pkg/signal"
 	"github.com/euiko/webapp/settings"
+	"github.com/go-chi/chi/v5/middleware"
 	"github.com/spf13/cobra"
 )
 
@@ -39,11 +40,13 @@ func WithDefaultMiddlewares(middlewares ...func(http.Handler) http.Handler) Opti
 
 func New(name string, shortName string, opts ...Option) *App {
 	app := App{
-		name:               name,
-		shortName:          shortName,
-		modules:            []api.Module{},
-		defaultMiddlewares: []func(http.Handler) http.Handler{},
-		settings:           settings.New(),
+		name:      name,
+		shortName: shortName,
+		modules:   []api.Module{},
+		defaultMiddlewares: []func(http.Handler) http.Handler{
+			middleware.Recoverer,
+		},
+		settings: settings.New(),
 	}
 
 	// apply options

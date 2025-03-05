@@ -1,6 +1,7 @@
 package token
 
 import (
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"strings"
@@ -93,10 +94,11 @@ func NewHeadlessJwtEncoding(algorithm jwa.SignatureAlgorithm, keyProvider KeyPro
 		"typ": "JWT",
 	}
 	header, _ := json.Marshal(headerData)
+	base64Header := base64.StdEncoding.EncodeToString(header)
 
 	e := HeadlessJwtEncoding{
 		encoding: jwtEncoding,
-		header:   header,
+		header:   []byte(base64Header),
 	}
 	return &e
 }
@@ -185,7 +187,7 @@ func (e *HeadlessJwtEncoding) Encode(subject string, audiences ...string) ([]byt
 
 func (e *HeadlessJwtEncoding) Decode(b []byte) (*Token, error) {
 	// append header first
-	b = append(e.header, b...)
-
+	headerBytes := append(e.header, '.')
+	b = append(headerBytes, b...)
 	return e.encoding.Decode(b)
 }
