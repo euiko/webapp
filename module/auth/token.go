@@ -29,24 +29,23 @@ func NewTokenEncoding(s *Settings) (token.Encoding, error) {
 }
 
 func jwtEncodingFactory(s *TokenEncodingSettings) (token.Encoding, error) {
-	return newJwtEncoding(s, func(sa jwa.SignatureAlgorithm, kp token.KeyProvider, jo ...token.JwtOption) token.Encoding {
-		return token.NewJwtEncoding(sa, kp, jo...)
+	return newJwtEncoding(s, func(sa jwa.SignatureAlgorithm, jo ...token.JwtOption) token.Encoding {
+		return token.NewJwtEncoding(sa, jo...)
 	})
 }
 
 func headlessJwtEncodingFactory(s *TokenEncodingSettings) (token.Encoding, error) {
-	return newJwtEncoding(s, func(sa jwa.SignatureAlgorithm, kp token.KeyProvider, jo ...token.JwtOption) token.Encoding {
-		return token.NewHeadlessJwtEncoding(sa, kp, jo...)
+	return newJwtEncoding(s, func(sa jwa.SignatureAlgorithm, jo ...token.JwtOption) token.Encoding {
+		return token.NewHeadlessJwtEncoding(sa, jo...)
 	})
 }
 
 func newJwtEncoding(
 	s *TokenEncodingSettings,
-	fn func(jwa.SignatureAlgorithm, token.KeyProvider, ...token.JwtOption) token.Encoding,
+	fn func(jwa.SignatureAlgorithm, ...token.JwtOption) token.Encoding,
 ) (token.Encoding, error) {
 	var (
-		keyProvider token.KeyProvider
-		hsKeys      = token.NewSymetricKey([]byte(s.HSKey))
+		keyProvider token.Key
 	)
 
 	algorithm, ok := jwa.LookupSignatureAlgorithm(s.JWTAlgorithm)
@@ -55,7 +54,15 @@ func newJwtEncoding(
 	}
 
 	if algorithm.IsSymmetric() {
-		keyProvider = hsKeys
+		if len(s.Keys) == 0 {
+			return nil, errors.New("symmetric jwt algorithm requires at least one keys specified in config")
+		}
+
+		keyProvider = token.NewSymetricKey([]byte(s.Keys[0]))
+	}
+
+	if keyProvider == nil {
+		return nil, errors.New("currently only support symetric keys")
 	}
 
 	opts := []token.JwtOption{
@@ -63,5 +70,5 @@ func newJwtEncoding(
 		token.JwtWithAudience(s.JWTAudience),
 		token.JwtWithExpiration(s.JWTTimeout),
 	}
-	return fn(algorithm, keyProvider, opts...), nil
+	return fn(algorithm, opts...), nil
 }

@@ -45,14 +45,20 @@ func (m *Module[User]) APIRoute(r api.Router) {
 
 func (m *Module[User]) initializeMiddleware(r api.Router) {
 	api.PrivateRouter(r, func(r api.Router) {
-		r.Use(NewMiddleware(m.tokenEncoding, nil))
+		r.Use(m.newMiddleware(nil))
 	})
 }
 
 func (m *Module[User]) loginHandler(w http.ResponseWriter, r *http.Request) {
 	var (
 		payload LoginPayload
+		keys    = m.getKeys()
 	)
+
+	if len(keys) == 0 {
+		helper.WriteResponse(w, errors.New("invalid configuration"))
+		return
+	}
 
 	if err := helper.DecodeRequest(r, &payload); err != nil {
 		helper.WriteResponse(w, err)
@@ -74,7 +80,8 @@ func (m *Module[User]) loginHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	subject := (*user).Subject()
-	token, err := m.tokenEncoding.Encode(subject, "webapp")
+	key := keys[0] // use the first key to create token
+	token, err := m.tokenEncoding.Encode(key, subject, "webapp")
 	if err != nil {
 		helper.WriteResponse(w, err)
 		return

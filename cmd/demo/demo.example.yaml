@@ -12,12 +12,13 @@ extra:
   auth:
     enabled: false
     token_encoding:
-      hs_key: ""
       jwt_algorithm: HS256
       jwt_audience: webapp
       jwt_issuer: webapp
       jwt_timeout: 24h0m0s
       type: headless-jwt
+      keys: 
+        - c2VjcmV047DEQpj8HBSa+/TImW+5JCeuQeRkm5NMpJWZG3hSuFU=
   static_server:
     embed:
       index_path: index.html

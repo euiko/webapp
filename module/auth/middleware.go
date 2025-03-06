@@ -8,11 +8,13 @@ import (
 	"github.com/euiko/webapp/pkg/token"
 )
 
-func NewMiddleware(tokenEncoding token.Encoding, unauthorizedHandler http.Handler) func(http.Handler) http.Handler {
+func (m *Module[User]) newMiddleware(unauthorizedHandler http.Handler) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			var (
 				prohibited bool
+				token      *token.Token
+				err        error
 			)
 
 			authorization := r.Header.Get("Authorization")
@@ -24,7 +26,15 @@ func NewMiddleware(tokenEncoding token.Encoding, unauthorizedHandler http.Handle
 			authorization = strings.TrimPrefix(authorization, "Bearer")
 			authorization = strings.TrimSpace(authorization)
 
-			token, err := tokenEncoding.Decode([]byte(authorization))
+			// try use all available keys
+			keys := m.getKeys()
+			for _, key := range keys {
+				token, err = m.tokenEncoding.Decode(key, []byte(authorization))
+				if err == nil {
+					break
+				}
+			}
+
 			if err != nil {
 				log.Error("failed to decode token", log.WithError(err))
 				prohibited = true

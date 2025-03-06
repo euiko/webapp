@@ -13,8 +13,7 @@ import (
 
 type (
 	JwtEncoding struct {
-		algorithm   jwa.SignatureAlgorithm
-		keyProvider KeyProvider
+		algorithm jwa.SignatureAlgorithm
 
 		useNBF   bool
 		now      func() time.Time
@@ -67,15 +66,14 @@ func JwtWithTimeProvider(now func() time.Time) JwtOption {
 }
 
 // NewJwtEncoding creates a new JwtEncoding with the given options.
-func NewJwtEncoding(algorithm jwa.SignatureAlgorithm, keyProvider KeyProvider, opts ...JwtOption) *JwtEncoding {
+func NewJwtEncoding(algorithm jwa.SignatureAlgorithm, opts ...JwtOption) *JwtEncoding {
 	e := JwtEncoding{
-		algorithm:   algorithm,
-		keyProvider: keyProvider,
-		useNBF:      false,
-		now:         time.Now,
-		issuer:      "",
-		audience:    "",
-		ttl:         24 * time.Hour, // default only valid for 24 hour
+		algorithm: algorithm,
+		useNBF:    false,
+		now:       time.Now,
+		issuer:    "",
+		audience:  "",
+		ttl:       24 * time.Hour, // default only valid for 24 hour
 	}
 
 	for _, opt := range opts {
@@ -86,8 +84,8 @@ func NewJwtEncoding(algorithm jwa.SignatureAlgorithm, keyProvider KeyProvider, o
 }
 
 // NewHeadlessJwtEncoding .
-func NewHeadlessJwtEncoding(algorithm jwa.SignatureAlgorithm, keyProvider KeyProvider, opts ...JwtOption) *HeadlessJwtEncoding {
-	jwtEncoding := NewJwtEncoding(algorithm, keyProvider, opts...)
+func NewHeadlessJwtEncoding(algorithm jwa.SignatureAlgorithm, opts ...JwtOption) *HeadlessJwtEncoding {
+	jwtEncoding := NewJwtEncoding(algorithm, opts...)
 
 	headerData := map[string]interface{}{
 		"alg": algorithm.String(),
@@ -103,7 +101,7 @@ func NewHeadlessJwtEncoding(algorithm jwa.SignatureAlgorithm, keyProvider KeyPro
 	return &e
 }
 
-func (e *JwtEncoding) Encode(subject string, audiences ...string) ([]byte, error) {
+func (e *JwtEncoding) Encode(key Key, subject string, audiences ...string) ([]byte, error) {
 	now := e.now()
 	builder := jwt.NewBuilder().
 		Subject(subject).
@@ -124,12 +122,12 @@ func (e *JwtEncoding) Encode(subject string, audiences ...string) ([]byte, error
 		return nil, err
 	}
 
-	return jwt.Sign(jwtToken, jwt.WithKey(e.algorithm, e.keyProvider.Private()))
+	return jwt.Sign(jwtToken, jwt.WithKey(e.algorithm, key.Private()))
 }
 
-func (e *JwtEncoding) Decode(b []byte) (*Token, error) {
+func (e *JwtEncoding) Decode(key Key, b []byte) (*Token, error) {
 	options := []jwt.ParseOption{
-		jwt.WithKey(e.algorithm, e.keyProvider.Public()),
+		jwt.WithKey(e.algorithm, key.Public()),
 	}
 
 	if e.issuer != "" {
@@ -169,8 +167,8 @@ func (e *JwtEncoding) Decode(b []byte) (*Token, error) {
 	return token, nil
 }
 
-func (e *HeadlessJwtEncoding) Encode(subject string, audiences ...string) ([]byte, error) {
-	encoded, err := e.encoding.Encode(subject, audiences...)
+func (e *HeadlessJwtEncoding) Encode(key Key, subject string, audiences ...string) ([]byte, error) {
+	encoded, err := e.encoding.Encode(key, subject, audiences...)
 	if err != nil {
 		return nil, err
 	}
@@ -185,9 +183,9 @@ func (e *HeadlessJwtEncoding) Encode(subject string, audiences ...string) ([]byt
 	return []byte(headless), nil
 }
 
-func (e *HeadlessJwtEncoding) Decode(b []byte) (*Token, error) {
+func (e *HeadlessJwtEncoding) Decode(key Key, b []byte) (*Token, error) {
 	// append header first
 	headerBytes := append(e.header, '.')
 	b = append(headerBytes, b...)
-	return e.encoding.Decode(b)
+	return e.encoding.Decode(key, b)
 }

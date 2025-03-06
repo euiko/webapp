@@ -14,6 +14,6 @@ type (
 		JWTIssuer    string        `mapstructure:"jwt_issuer"`
 		JWTAudience  string        `mapstructure:"jwt_audience"`
 		JWTTimeout   time.Duration `mapstructure:"jwt_timeout"`
-		HSKey        string        `mapstructure:"hs_key"`
+		Keys         []string      `mapstructure:"keys"`
 	}
 )
