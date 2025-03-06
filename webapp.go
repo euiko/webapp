@@ -12,7 +12,7 @@ import (
 	"github.com/euiko/webapp/pkg/log"
 	"github.com/euiko/webapp/pkg/signal"
 	"github.com/euiko/webapp/settings"
-	"github.com/go-chi/chi/v5"
+	"github.com/go-chi/chi/v5/middleware"
 	"github.com/spf13/cobra"
 )
 
@@ -24,7 +24,7 @@ type (
 
 		registry           []api.ModuleFactory
 		modules            []api.Module
-		defaultMiddlewares []Middleware
+		defaultMiddlewares []func(http.Handler) http.Handler
 	}
 
 	Middleware func(http.Handler) http.Handler
@@ -32,7 +32,7 @@ type (
 	Option func(*App)
 )
 
-func WithDefaultMiddlewares(middlewares ...Middleware) Option {
+func WithDefaultMiddlewares(middlewares ...func(http.Handler) http.Handler) Option {
 	return func(a *App) {
 		a.defaultMiddlewares = middlewares
 	}
@@ -40,11 +40,13 @@ func WithDefaultMiddlewares(middlewares ...Middleware) Option {
 
 func New(name string, shortName string, opts ...Option) *App {
 	app := App{
-		name:               name,
-		shortName:          shortName,
-		modules:            []api.Module{},
-		defaultMiddlewares: []Middleware{},
-		settings:           settings.New(),
+		name:      name,
+		shortName: shortName,
+		modules:   []api.Module{},
+		defaultMiddlewares: []func(http.Handler) http.Handler{
+			middleware.Recoverer,
+		},
+		settings: settings.New(),
 	}
 
 	// apply options
@@ -72,17 +74,16 @@ func (a *App) Run(ctx context.Context) error {
 		a.modules[i] = factory()
 	}
 
-	// load settings
-	// TODO: handle error when unmarshaling
-	unmarshaler, err := a.loadSettings()
-	if err != nil && err != ErrConfigNotFound {
-		return err
-	}
-
-	if unmarshaler != nil {
-		if err := unmarshaler.Unmarshal(&a.settings); err != nil {
-			return err
+	// configure modules default settings
+	for _, module := range a.modules {
+		if loader, ok := module.(api.SettingsLoader); ok {
+			loader.DefaultSettings(&a.settings)
 		}
+	}
+	// load settings
+	loader := settings.NewLoader(a.name, a.shortName)
+	if err := loader.Load(&a.settings); err != nil && err != settings.ErrConfigNotFound {
+		return err
 	}
 
 	// initialize logger
@@ -91,7 +92,9 @@ func (a *App) Run(ctx context.Context) error {
 	// initialize modules
 	log.Trace("initializing modules...")
 	for _, module := range a.modules {
-		module.Init(ctx, &a.settings)
+		if err := module.Init(ctx, &a.settings); err != nil {
+			return err
+		}
 	}
 
 	rootCmd := a.initializeCli()
@@ -157,45 +160,6 @@ func (a *App) initializeCli() *cobra.Command {
 	}
 
 	return &rootCmd
-}
-
-// internal createServer function
-func (a *App) createServer() http.Server {
-	// use chi as the router
-	router := chi.NewRouter()
-
-	// use default middlewares
-	for _, middleware := range a.defaultMiddlewares {
-		router.Use(middleware)
-	}
-
-	// register routes
-	for _, module := range a.modules {
-		// register routes
-		if service, ok := module.(api.Service); ok {
-			service.Route(router)
-		}
-	}
-
-	// register api routes
-	router.Route(a.settings.Server.ApiPrefix, func(r chi.Router) {
-		for _, module := range a.modules {
-			// register routes
-			if service, ok := module.(api.APIService); ok {
-				service.APIRoute(r)
-			}
-		}
-	})
-
-	// creates http server
-	// TODO: add https support
-	return http.Server{
-		Addr:         a.settings.Server.Addr,
-		Handler:      router,
-		ReadTimeout:  a.settings.Server.ReadTimeout,
-		WriteTimeout: a.settings.Server.WriteTimeout,
-		IdleTimeout:  a.settings.Server.IdleTimeout,
-	}
 }
 
 func (a *App) builtInModules() []api.ModuleFactory {

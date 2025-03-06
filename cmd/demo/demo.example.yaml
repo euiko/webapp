@@ -2,18 +2,28 @@ db:
   extra:
     sql: {}
   sql:
-    enabled: true
-    driver: pgx
     conn_max_lifetime: 1m0s
+    driver: pgx
+    enabled: true
     max_idle_conns: 10
     max_open_conns: 10
     uri: postgres://demo:12345678@localhost:15432/demo?sslmode=disable
 extra:
+  auth:
+    enabled: false
+    token_encoding:
+      jwt_algorithm: HS256
+      jwt_audience: webapp
+      jwt_issuer: webapp
+      jwt_timeout: 24h0m0s
+      type: headless-jwt
+      keys: 
+        - c2VjcmV047DEQpj8HBSa+/TImW+5JCeuQeRkm5NMpJWZG3hSuFU=
   static_server:
-    enabled: true
     embed:
-      indexpath: index.html
-      usempa: false
+      index_path: index.html
+      use_mpa: false
+    enabled: true
     proxy:
       upstream: http://localhost:5173
 log:
