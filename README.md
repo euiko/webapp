@@ -24,15 +24,17 @@ An opinionated Go fullstack framework with batteries included.
 - [ ] Stream/IO Processing
 - [ ] Built-in Modules
     - [x] Static File (to serve frontend assets)
-    - [ ] Authentication
+    - [x] Authentication
     - [ ] RBAC
     - [ ] Audit Log
     - [ ] File Storage
     - [ ] etc.
+- [ ] Cache
+  - [x] In-Memory Cache
+  - [ ] Dragonfly
 - [x] Database
   - [x] SQL
   - [x] ORM
   - [ ] NoSQL
-  - [ ] Key-Value
   - [ ] etc.
 - [ ] Testing
