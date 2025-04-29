@@ -31,6 +31,7 @@ require (
 	github.com/Azure/go-autorest/tracing v0.6.0 // indirect
 	github.com/decred/dcrd/dcrec/secp256k1/v4 v4.4.0 // indirect
 	github.com/elnormous/contenttype v1.0.4 // indirect
+	github.com/ettle/strcase v0.2.0
 	github.com/fsnotify/fsnotify v1.7.0 // indirect
 	github.com/gabriel-vasile/mimetype v1.4.8 // indirect
 	github.com/ggicci/httpin v0.19.0 // indirect

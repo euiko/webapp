@@ -3,7 +3,7 @@ package webapp
 import (
 	"net/http"
 
-	"github.com/euiko/webapp/api"
+	"github.com/euiko/webapp/core"
 	"github.com/go-chi/chi/v5"
 )
 
@@ -13,26 +13,27 @@ func (a *App) createServer() http.Server {
 	router := newRouter(chi.NewRouter())
 
 	// use default middlewares
+	router.Use(newInjectAppMiddleware(a))
 	router.Use(a.defaultMiddlewares...)
+	router.Use(newSessionMiddleware(&a.settings))
 
 	// register routes
-	router.Group(func(r api.Router) {
-		for _, module := range a.modules {
-			// register routes
-			if service, ok := module.(api.Service); ok {
-				service.Route(router)
-			}
-		}
+	visitModules(a.modules, func(module core.ServiceModule) error {
+		module.Route(router)
+		return nil
+	})
+	// register api routes
+	router.Route(a.settings.Server.ApiPrefix, func(r core.Router) {
+		_ = visitModules(a.modules, func(module core.APIServiceModule) error {
+			module.APIRoute(r)
+			return nil
+		})
 	})
 
-	// register api routes
-	router.Route(a.settings.Server.ApiPrefix, func(r api.Router) {
-		for _, module := range a.modules {
-			// register routes
-			if service, ok := module.(api.APIService); ok {
-				service.APIRoute(r)
-			}
-		}
+	// call post route hook
+	_ = visitModules(a.modules, func(module core.PostRouterHook) error {
+		module.PostRoute(router)
+		return nil
 	})
 
 	// creates http server

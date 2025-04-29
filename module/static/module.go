@@ -3,7 +3,7 @@ package static
 import (
 	"context"
 
-	"github.com/euiko/webapp/api"
+	"github.com/euiko/webapp/core"
 	"github.com/euiko/webapp/settings"
 )
 
@@ -41,8 +41,8 @@ func NewModule() *Module {
 	}
 }
 
-func ModuleFactory() func() api.Module {
-	return func() api.Module {
+func ModuleFactory() core.ModuleFactory {
+	return func(core.App) core.Module {
 		return NewModule()
 	}
 }

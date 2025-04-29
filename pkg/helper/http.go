@@ -59,6 +59,18 @@ var (
 )
 
 func DecodeRequest(r *http.Request, target interface{}) error {
+	if err := httpin.DecodeTo(r, target); err != nil {
+		return errors.Join(err, ErrInvalidRequest)
+	}
+
+	if err := validator.Validate(target); err != nil {
+		return errors.Join(err, ErrInvalidRequest)
+	}
+
+	return nil
+}
+
+func DecodeRequestBody(r *http.Request, target interface{}) error {
 	var (
 		contentType, err = contenttype.GetMediaType(r)
 	)
@@ -143,7 +155,7 @@ func WriteResponse(w http.ResponseWriter, data interface{}, opts ...WriteRespons
 	}
 
 	switch val.Kind() {
-	case reflect.Struct, reflect.Map, reflect.Array:
+	case reflect.Struct, reflect.Map, reflect.Array, reflect.Slice:
 		err = writeJSON(w, data, config.status)
 	default:
 		err = fmt.Errorf("writing a %s is not supported yet", val.Kind())

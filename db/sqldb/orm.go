@@ -3,6 +3,7 @@ package sqldb
 import (
 	"database/sql"
 	"errors"
+	"time"
 
 	"github.com/euiko/webapp/pkg/log"
 	"github.com/euiko/webapp/settings"
@@ -14,7 +15,17 @@ import (
 )
 
 type (
+	BaseSchema struct {
+		ID        int64     `bun:"id,pk,autoincrement"`
+		CreatedAt time.Time `bun:"created_at,notnull,nullzero"`
+		UpdatedAt time.Time `bun:"updated_at,notnull,nullzero"`
+	}
+
 	dialectFactory func(*settings.SqlDatabase) schema.Dialect
+
+	OrmDB struct {
+		*bun.DB
+	}
 )
 
 var (
@@ -31,7 +42,7 @@ var (
 	}
 )
 
-func ORM(names ...string) *bun.DB {
+func ORM(names ...string) OrmDB {
 	name := defaultDbName
 	if len(names) > 0 {
 		name = names[0]
@@ -47,7 +58,7 @@ func ORM(names ...string) *bun.DB {
 		panic(ErrNotOpened)
 	}
 
-	return ormInstances[name]
+	return OrmDB{ormInstances[name]}
 
 }
 

@@ -6,7 +6,7 @@ import (
 	"path"
 	"strings"
 
-	"github.com/euiko/webapp/api"
+	"github.com/euiko/webapp/core"
 	"github.com/euiko/webapp/db/sqldb"
 	"github.com/euiko/webapp/settings"
 	"github.com/spf13/cobra"
@@ -26,16 +26,10 @@ type (
 	dbCmdOption func(c *dbCmdConfig)
 )
 
-func Migration() api.Module {
-	return api.NewModule(api.ModuleWithCLI(func(cmd *cobra.Command, s *settings.Settings) {
+func Migration(app core.App) core.Module {
+	return core.NewModule(core.ModuleWithCLI(func(cmd *cobra.Command, s *settings.Settings) {
 		cmd.AddCommand(migrationCmd(&s.DB.Sql))
 	}))
-}
-
-func skipOpenDb() func(c *dbCmdConfig) {
-	return func(c *dbCmdConfig) {
-		c.openDb = false
-	}
 }
 
 func migrationCmd(s *settings.SqlDatabase) *cobra.Command {
@@ -50,6 +44,11 @@ func migrationCmd(s *settings.SqlDatabase) *cobra.Command {
 	cmd.AddCommand(newDbCmd(s, dbUnlockCmd))
 	cmd.AddCommand(newDbCmd(s, dbStatusCmd))
 	return cmd
+}
+func skipOpenDb() func(c *dbCmdConfig) {
+	return func(c *dbCmdConfig) {
+		c.openDb = false
+	}
 }
 
 func dbMigrateCmd(migrator *sqldb.Migrator, cmd *cobra.Command) {
@@ -180,7 +179,7 @@ func newDbCmd(
 			if err = sqldb.Open(s); err != nil {
 				return err
 			}
-			migrator, err = sqldb.NewMigrator(sqldb.ORM())
+			migrator, err = sqldb.NewMigrator(sqldb.ORM().DB)
 		} else {
 			migrator, err = sqldb.NewMigrator(nil)
 		}

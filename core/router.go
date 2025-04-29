@@ -1,4 +1,4 @@
-package api
+package core
 
 import (
 	"net/http"
@@ -7,9 +7,10 @@ import (
 )
 
 type (
+
 	// Router is an interface that provide routing methods that mostly
-	// resemble from chi.Router with difference in:
-	// - Additional NamedGroup function
+	// resemble from chi.Router, this is also used to decouple from the
+	// thirdparty library
 	Router interface {
 		http.Handler
 		chi.Routes
@@ -58,19 +59,7 @@ type (
 		// MethodNotAllowed defines a handler to respond whenever a method is
 		// not allowed.
 		MethodNotAllowed(h http.HandlerFunc)
-
-		// NamedGroup adds or reuse inline-Router that unique by its name
-		// along the current routing path, with a fresh middleware stack for the inline-Router.
-		NamedGroup(name string, fn func(r Router)) Router
 	}
-)
 
-const (
-	protectedGroupName = "private"
+	MiddlewareFunc func(http.Handler) http.Handler
 )
-
-// PrivateRouter returns a group/sub-router for private/protected routes
-// this can be used to add protected resources to the router
-func PrivateRouter(r Router, fn func(r Router)) Router {
-	return r.NamedGroup(protectedGroupName, fn)
-}
