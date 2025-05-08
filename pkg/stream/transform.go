@@ -1,8 +1,8 @@
 package stream
 
-func Map[T any, E any](s Stream[T], mapFunc MapFunc[T, E]) Stream[E] {
-	return Stream[E]{
-		next: func(next Continuation[E]) {
+func Map[T any, U any](s Stream[T], mapFunc MapFunc[T, U]) Stream[U] {
+	return Stream[U]{
+		next: func(next Continuation[U]) {
 			s.next(func(t T) {
 				e := mapFunc(t)
 				next(e)

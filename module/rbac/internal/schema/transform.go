@@ -4,7 +4,7 @@ import "github.com/euiko/webapp/module/rbac/lib/role"
 
 func (s Role) ToBase() role.Role {
 	return role.Role{
-		BaseRole: role.BaseRole{
+		Base: role.Base{
 			Name:        s.Name,
 			PrettyName:  s.PrettyName,
 			Description: s.Description,

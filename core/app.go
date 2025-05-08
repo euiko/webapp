@@ -11,5 +11,6 @@ type (
 		Settings() *settings.Settings
 		Start(context.Context) error
 		Modules() []Module
+		AddMiddleware(MiddlewareFunc)
 	}
 )

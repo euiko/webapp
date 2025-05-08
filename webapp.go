@@ -22,9 +22,9 @@ type (
 		shortName string
 		settings  settings.Settings
 
-		registry           []core.ModuleFactory
-		modules            []core.Module
-		defaultMiddlewares []func(http.Handler) http.Handler
+		registry    []core.ModuleFactory
+		modules     []core.Module
+		middlewares []func(http.Handler) http.Handler
 	}
 
 	Middleware func(http.Handler) http.Handler
@@ -38,9 +38,9 @@ var (
 	appContextKey = appContextKeyType{}
 )
 
-func WithDefaultMiddlewares(middlewares ...func(http.Handler) http.Handler) Option {
+func WithMiddlewares(middlewares ...func(http.Handler) http.Handler) Option {
 	return func(a *App) {
-		a.defaultMiddlewares = middlewares
+		a.middlewares = middlewares
 	}
 }
 
@@ -49,7 +49,7 @@ func New(name string, shortName string, opts ...Option) *App {
 		name:      name,
 		shortName: shortName,
 		modules:   []core.Module{},
-		defaultMiddlewares: []func(http.Handler) http.Handler{
+		middlewares: []func(http.Handler) http.Handler{
 			middleware.Recoverer,
 		},
 		settings: settings.New(),
@@ -199,6 +199,10 @@ func (a *App) Modules() []core.Module {
 
 func (a *App) Settings() *settings.Settings {
 	return &a.settings
+}
+
+func (a *App) AddMiddleware(middleware core.MiddlewareFunc) {
+	a.middlewares = append(a.middlewares, middleware)
 }
 
 func (a *App) initializeCli() *cobra.Command {

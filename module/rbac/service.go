@@ -24,7 +24,7 @@ func (m *Module) PostRoute(r core.Router) {
 	// when default roles is not defined then we will set the default roles
 	// to be admin with all permissions
 	if len(m.defaultRoles) == 0 {
-		m.defaultRoles = append(m.defaultRoles, role.BaseRole{
+		m.defaultRoles = append(m.defaultRoles, role.Base{
 			Name:        "admin",
 			PrettyName:  "Administrator",
 			Description: "Role with all permissions",
@@ -37,11 +37,14 @@ func (m *Module) APIRoute(r core.Router) {
 	r.Group(func(r core.Router) {
 		r.Use(authlib.AuthRequiredMiddleware(m.app))
 		r.Get("/permissions", m.listAllPermissionsHandler)
-		r.Get("/roles", m.listAllRolesHandler)
 		r.Method("GET", "/users/me/role", m.getRoleHandler(m.userFromSession))
 
+		// endpoint that requires manage roles permission
+		r.Get("/roles", m.listAllRolesHandler)
+		r.Method("POST", "/roles", role.Handler(lib.PermissionManageRoles, http.HandlerFunc(m.addRoleHandler)))
+		r.Method("DELETE", "/roles/{name}", role.Handler(lib.PermissionManageRoles, http.HandlerFunc(m.removeRoleHandler)))
+		r.Method("PUT", "/roles/{name}", role.Handler(lib.PermissionManageRoles, http.HandlerFunc(m.updateRoleHandler)))
 		r.Method("GET", "/users/{id}/role", role.Handler(lib.PermissionManageRoles, m.getRoleHandler(m.userFromIDParams)))
-		r.Method("PUT", "/users/{id}/role", role.Handler(lib.PermissionManageRoles, http.HandlerFunc(m.setUserRoleHandler)))
 	})
 }
 
@@ -88,7 +91,7 @@ func (m *Module) getRoleHandler(userProvider func(*http.Request) authlib.User) h
 		}
 
 		roleName := roleUser.RoleName()
-		role, err := m.GetRoleByName(r.Context(), roleName)
+		role, err := m.GetRole(r.Context(), roleName)
 		if err != nil {
 			helper.WriteResponse(w, err)
 			return
@@ -99,16 +102,48 @@ func (m *Module) getRoleHandler(userProvider func(*http.Request) authlib.User) h
 	})
 }
 
-func (m *Module) setUserRoleHandler(w http.ResponseWriter, r *http.Request) {
-	helper.WriteResponse(w, errors.New("not yet implemented"))
-}
-
 func (m *Module) addRoleHandler(w http.ResponseWriter, r *http.Request) {
-	helper.WriteResponse(w, errors.New("not yet implemented"))
+	var payload api.NewRole
+	if err := helper.DecodeRequestBody(r, &payload); err != nil {
+		helper.WriteResponse(w, err)
+		return
+	}
+
+	if err := m.AddRole(r.Context(), payload.ToBase()); err != nil {
+		helper.WriteResponse(w, err)
+		return
+	}
+
+	helper.WriteResponse(w, "created")
 }
 
 func (m *Module) removeRoleHandler(w http.ResponseWriter, r *http.Request) {
-	helper.WriteResponse(w, errors.New("not yet implemented"))
+	roleName := chi.URLParam(r, "name")
+	if err := m.RemoveRole(r.Context(), roleName); err != nil {
+		helper.WriteResponse(w, err)
+		return
+	}
+
+	helper.WriteResponse(w, "deleted")
+}
+
+func (m *Module) updateRoleHandler(w http.ResponseWriter, r *http.Request) {
+	var (
+		payload  api.UpdateRole
+		roleName = chi.URLParam(r, "name")
+	)
+
+	if err := helper.DecodeRequestBody(r, &payload); err != nil {
+		helper.WriteResponse(w, err)
+		return
+	}
+
+	if err := m.UpdateRole(r.Context(), roleName, payload.ToBase()); err != nil {
+		helper.WriteResponse(w, err)
+		return
+	}
+
+	helper.WriteResponse(w, "updated")
 }
 
 func (m *Module) userFromSession(r *http.Request) authlib.User {

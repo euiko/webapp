@@ -14,7 +14,7 @@ func (a *App) createServer() http.Server {
 
 	// use default middlewares
 	router.Use(newInjectAppMiddleware(a))
-	router.Use(a.defaultMiddlewares...)
+	router.Use(a.middlewares...)
 	router.Use(newSessionMiddleware(&a.settings))
 
 	// register routes

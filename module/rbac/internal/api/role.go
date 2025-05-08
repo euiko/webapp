@@ -16,6 +16,14 @@ type (
 		Permissions []int64 `json:"permissions"`
 	}
 
+	NewRole BaseRole
+
+	UpdateRole struct {
+		PrettyName  string  `json:"pretty_name"`
+		Description string  `json:"description"`
+		Permissions []int64 `json:"permissions"`
+	}
+
 	Role struct {
 		BaseRole
 		ID        int64     `json:"id"`
@@ -69,5 +77,22 @@ func (p ListAllRolesParams) ToBase() lib.ListAllRolesParams {
 	return lib.ListAllRolesParams{
 		SearchParams:     p.SearchParams.ToBase(),
 		PaginationParams: p.PaginationParams.ToBase(),
+	}
+}
+
+func (p NewRole) ToBase() role.New {
+	return role.New{
+		Name:        p.Name,
+		PrettyName:  p.PrettyName,
+		Description: p.Description,
+		Permissions: p.Permissions,
+	}
+}
+
+func (p UpdateRole) ToBase() role.Update {
+	return role.Update{
+		PrettyName:  p.PrettyName,
+		Description: p.Description,
+		Permissions: p.Permissions,
 	}
 }

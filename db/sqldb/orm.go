@@ -23,9 +23,7 @@ type (
 
 	dialectFactory func(*settings.SqlDatabase) schema.Dialect
 
-	OrmDB struct {
-		*bun.DB
-	}
+	OrmDB bun.IDB
 )
 
 var (
@@ -42,7 +40,7 @@ var (
 	}
 )
 
-func ORM(names ...string) OrmDB {
+func ORM(names ...string) *bun.DB {
 	name := defaultDbName
 	if len(names) > 0 {
 		name = names[0]
@@ -58,8 +56,7 @@ func ORM(names ...string) OrmDB {
 		panic(ErrNotOpened)
 	}
 
-	return OrmDB{ormInstances[name]}
-
+	return ormInstances[name]
 }
 
 func RegisterORMDialect(name string, f dialectFactory) error {

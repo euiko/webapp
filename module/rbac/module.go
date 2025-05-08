@@ -21,7 +21,7 @@ type (
 		permissionManager role.PermissionManager
 		endpoints         []role.Endpoint
 		endpointsMap      map[int64]role.Endpoint
-		defaultRoles      []role.BaseRole
+		defaultRoles      []role.Base
 		store             Store
 	}
 
@@ -41,7 +41,7 @@ func ModuleFactory(options ...ModuleOption) core.ModuleFactory {
 	}
 }
 
-func WithDefaultRoles(roles ...role.BaseRole) ModuleOption {
+func WithDefaultRoles(roles ...role.Base) ModuleOption {
 	return func(m *Module) {
 		m.defaultRoles = roles
 	}
@@ -59,7 +59,7 @@ func NewModule(app core.App, options ...ModuleOption) *Module {
 		permissionManager: nil,
 		endpoints:         make([]role.Endpoint, 0),
 		endpointsMap:      map[int64]role.Endpoint{},
-		defaultRoles:      []role.BaseRole{},
+		defaultRoles:      []role.Base{},
 		storeFactory: func(app core.App) Store {
 			return NewOrmStore(sqldb.ORM())
 		},
@@ -68,6 +68,7 @@ func NewModule(app core.App, options ...ModuleOption) *Module {
 
 func (m *Module) Init(ctx context.Context, s *settings.Settings) error {
 	sqldb.AddMigrationFS(embededMigrationFS)
+	m.app.AddMiddleware(newMiddleware(m))
 
 	return nil
 }
@@ -88,14 +89,6 @@ func (m *Module) BeforeStart(ctx context.Context) error {
 	return nil
 }
 
-func (m *Module) GetPermissionByID(id int64) (*role.Permission, error) {
-	if r, ok := m.permissionManager.Map()[id]; ok {
-		return r, nil
-	}
-
-	return nil, errors.New("role not found")
-}
-
 func (m *Module) ListAllRoles(ctx context.Context, params lib.ListAllRolesParams) ([]role.Role, int, error) {
 	if err := validator.Validate(params); err != nil {
 		return nil, 0, err
@@ -104,12 +97,65 @@ func (m *Module) ListAllRoles(ctx context.Context, params lib.ListAllRolesParams
 	return m.store.GetAll(ctx, params)
 }
 
-func (m *Module) GetRoleByName(ctx context.Context, name string) (*role.Role, error) {
+func (m *Module) GetRole(ctx context.Context, name string) (*role.Role, error) {
 	if name == "" {
 		return nil, errors.New("role name is empty")
 	}
 
-	return m.store.GetRoleByName(ctx, name)
+	return m.store.Get(ctx, name)
+}
+
+func (m *Module) AddRole(ctx context.Context, r role.New) error {
+	if err := validator.Validate(r); err != nil {
+		return err
+	}
+
+	// ensure all role permissions are valid
+	if !m.permissionManager.HasAllIDs(r.Permissions...) {
+		return errors.New("invalid role permissions")
+	}
+
+	return m.store.Create(ctx, r)
+}
+
+func (m *Module) RemoveRole(ctx context.Context, name string) error {
+	if name == "" {
+		return errors.New("role name is empty")
+	}
+
+	return m.store.Delete(ctx, name)
+}
+
+func (m *Module) UpdateRole(ctx context.Context, name string, r role.Update) error {
+	if name == "" {
+		return errors.New("role name is empty")
+	}
+
+	if err := validator.Validate(r); err != nil {
+		return err
+	}
+
+	// ensure all role permissions are valid
+	if !m.permissionManager.HasAllIDs(r.Permissions...) {
+		return errors.New("invalid role permissions")
+	}
+
+	return m.store.Update(ctx, name, r)
+}
+
+func (m *Module) buildPermissionManager(permissionIDs ...int64) role.PermissionManager {
+	var (
+		permissions   = make([]*role.Permission, 0, len(permissionIDs))
+		permissionMap = m.permissionManager.Map()
+	)
+
+	for _, id := range permissionIDs {
+		if p, ok := permissionMap[id]; ok {
+			permissions = append(permissions, p)
+		}
+	}
+
+	return role.NewPermissionManager(permissions)
 }
 
 func (m *Module) buildEndpointsMap() {
@@ -119,11 +165,11 @@ func (m *Module) buildEndpointsMap() {
 	}
 }
 
-func (m *Module) ensureRoleExists(ctx context.Context, r role.BaseRole) error {
+func (m *Module) ensureRoleExists(ctx context.Context, r role.Base) error {
 	// skip if already exists
-	_, err := m.store.GetRoleByName(ctx, r.Name)
+	_, err := m.store.Get(ctx, r.Name)
 	if sqldb.IsNoRows(err) {
-		return m.store.CreateRole(ctx, role.NewRole(r))
+		return m.store.Create(ctx, role.New(r))
 	}
 
 	return err

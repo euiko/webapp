@@ -179,7 +179,7 @@ func newDbCmd(
 			if err = sqldb.Open(s); err != nil {
 				return err
 			}
-			migrator, err = sqldb.NewMigrator(sqldb.ORM().DB)
+			migrator, err = sqldb.NewMigrator(sqldb.ORM())
 		} else {
 			migrator, err = sqldb.NewMigrator(nil)
 		}

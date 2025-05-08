@@ -7,7 +7,7 @@ services:
       POSTGRES_PASSWORD: 12345678
       POSTGRES_DB: demo
     ports:
-      - "15432:5432"
+      - "25432:5432"
     volumes:
       - postgres:/var/lib/postgresql/data
 volumes:

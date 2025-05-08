@@ -12,8 +12,10 @@ import (
 type (
 	Store interface {
 		GetAll(ctx context.Context, params lib.ListAllRolesParams) ([]role.Role, int, error)
-		GetRoleByName(ctx context.Context, name string) (*role.Role, error)
-		CreateRole(ctx context.Context, role role.NewRole) error
+		Get(ctx context.Context, name string) (*role.Role, error)
+		Create(ctx context.Context, role role.New) error
+		Delete(ctx context.Context, name string) error
+		Update(ctx context.Context, name string, role role.Update) error
 	}
 
 	ormStore struct {
@@ -59,7 +61,7 @@ func (s *ormStore) GetAll(ctx context.Context, params lib.ListAllRolesParams) ([
 }
 
 // GetRoleByName implements Store.
-func (s *ormStore) GetRoleByName(ctx context.Context, name string) (*role.Role, error) {
+func (s *ormStore) Get(ctx context.Context, name string) (*role.Role, error) {
 	var role schema.Role
 	query := s.db.NewSelect().
 		Model(&role).
@@ -75,8 +77,8 @@ func (s *ormStore) GetRoleByName(ctx context.Context, name string) (*role.Role, 
 	return &r, nil
 }
 
-// CreateRole implements Store.
-func (s *ormStore) CreateRole(ctx context.Context, role role.NewRole) error {
+// Create implements Store.
+func (s *ormStore) Create(ctx context.Context, role role.New) error {
 	newRole := schema.Role{
 		Name:        role.Name,
 		PrettyName:  role.PrettyName,
@@ -92,4 +94,29 @@ func (s *ormStore) CreateRole(ctx context.Context, role role.NewRole) error {
 	}
 
 	return nil
+}
+
+// Update implements Store.
+func (s *ormStore) Update(ctx context.Context, name string, role role.Update) error {
+	updatedRole := schema.Role{
+		PrettyName:  role.PrettyName,
+		Description: role.Description,
+		Permissions: role.Permissions,
+	}
+
+	_, err := s.db.NewUpdate().
+		Model(&updatedRole).
+		Where("name = ?", name).
+		Exec(ctx)
+
+	return err
+}
+
+// Delete implements Store.
+func (s *ormStore) Delete(ctx context.Context, name string) error {
+	_, err := s.db.NewDelete().
+		Model((*schema.Role)(nil)).
+		Where("name = ?", name).
+		Exec(ctx)
+	return err
 }
