@@ -6,7 +6,7 @@ import (
 	"os"
 	"time"
 
-	"github.com/euiko/webapp/api"
+	"github.com/euiko/webapp/core"
 	"github.com/euiko/webapp/db"
 	"github.com/euiko/webapp/internal/cli"
 	"github.com/euiko/webapp/pkg/log"
@@ -22,19 +22,25 @@ type (
 		shortName string
 		settings  settings.Settings
 
-		registry           []api.ModuleFactory
-		modules            []api.Module
-		defaultMiddlewares []func(http.Handler) http.Handler
+		registry    []core.ModuleFactory
+		modules     []core.Module
+		middlewares []func(http.Handler) http.Handler
 	}
 
 	Middleware func(http.Handler) http.Handler
 
 	Option func(*App)
+
+	appContextKeyType struct{}
 )
 
-func WithDefaultMiddlewares(middlewares ...func(http.Handler) http.Handler) Option {
+var (
+	appContextKey = appContextKeyType{}
+)
+
+func WithMiddlewares(middlewares ...func(http.Handler) http.Handler) Option {
 	return func(a *App) {
-		a.defaultMiddlewares = middlewares
+		a.middlewares = middlewares
 	}
 }
 
@@ -42,8 +48,8 @@ func New(name string, shortName string, opts ...Option) *App {
 	app := App{
 		name:      name,
 		shortName: shortName,
-		modules:   []api.Module{},
-		defaultMiddlewares: []func(http.Handler) http.Handler{
+		modules:   []core.Module{},
+		middlewares: []func(http.Handler) http.Handler{
 			middleware.Recoverer,
 		},
 		settings: settings.New(),
@@ -60,23 +66,40 @@ func New(name string, shortName string, opts ...Option) *App {
 	return &app
 }
 
+func AppFromContext(ctx context.Context) (core.App, bool) {
+	v := ctx.Value(appContextKey)
+	if v == nil {
+		return nil, false
+	}
+
+	app, ok := v.(core.App)
+	if !ok {
+		return nil, false
+	}
+
+	return app, true
+}
+
 // Register a module factory function to the app
-func (a *App) Register(f api.ModuleFactory) {
+func (a *App) Register(f core.ModuleFactory) {
 	a.registry = append(a.registry, f)
 }
 
 // Run the app
 func (a *App) Run(ctx context.Context) error {
+	// inject app into context
+	ctx = contextWithApp(ctx, a)
+
 	// instantiate modules
 	log.Trace("instantiating modules...")
-	a.modules = make([]api.Module, len(a.registry))
+	a.modules = make([]core.Module, len(a.registry))
 	for i, factory := range a.registry {
-		a.modules[i] = factory()
+		a.modules[i] = factory(a)
 	}
 
 	// configure modules default settings
 	for _, module := range a.modules {
-		if loader, ok := module.(api.SettingsLoader); ok {
+		if loader, ok := module.(core.SettingsLoaderHook); ok {
 			loader.DefaultSettings(&a.settings)
 		}
 	}
@@ -96,6 +119,15 @@ func (a *App) Run(ctx context.Context) error {
 			return err
 		}
 	}
+
+	// call module loaded hook
+	_ = visitModules(a.modules, func(module core.ModuleLoadedHook) error {
+		for _, m := range a.modules {
+			module.ModuleLoaded(m)
+		}
+
+		return nil
+	})
 
 	rootCmd := a.initializeCli()
 	if err := rootCmd.ExecuteContext(ctx); err != nil {
@@ -121,6 +153,19 @@ func (a *App) Start(ctx context.Context) error {
 
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
+
+	// call before start hook
+	if err := visitModules(a.modules, func(module core.BeforeStartHook) error {
+		if err := module.BeforeStart(ctx); err != nil {
+			log.Error("before start hook error", log.WithError(err))
+			return err
+		}
+
+		return nil
+	}); err != nil {
+		return err
+	}
+
 	go func() {
 		if e := server.ListenAndServe(); e != nil && e != http.ErrServerClosed {
 			err = e
@@ -148,13 +193,25 @@ func (a *App) Start(ctx context.Context) error {
 	return server.Shutdown(shutdownCtx)
 }
 
+func (a *App) Modules() []core.Module {
+	return a.modules
+}
+
+func (a *App) Settings() *settings.Settings {
+	return &a.settings
+}
+
+func (a *App) AddMiddleware(middleware core.MiddlewareFunc) {
+	a.middlewares = append(a.middlewares, middleware)
+}
+
 func (a *App) initializeCli() *cobra.Command {
 	rootCmd := cobra.Command{
 		Use: a.name,
 	}
 
 	for m := range a.modules {
-		if cli, ok := a.modules[m].(api.CLI); ok {
+		if cli, ok := a.modules[m].(core.CliModule); ok {
 			cli.Command(&rootCmd)
 		}
 	}
@@ -162,9 +219,9 @@ func (a *App) initializeCli() *cobra.Command {
 	return &rootCmd
 }
 
-func (a *App) builtInModules() []api.ModuleFactory {
-	return []api.ModuleFactory{
-		cli.Server(a),
+func (a *App) builtInModules() []core.ModuleFactory {
+	return []core.ModuleFactory{
+		cli.Server,
 		cli.Migration,
 		cli.Settings,
 	}
@@ -174,4 +231,23 @@ func initializeLogger(settings settings.Log) {
 	// use LogrusLogger as default logger
 	level := log.ParseLevel(settings.Level)
 	log.SetDefault(log.NewLogrusLogger(level))
+}
+
+func visitModules[T any](modules []core.Module, f func(module T) error) error {
+	var err error
+	for _, module := range modules {
+		if module, ok := module.(T); ok {
+			err = f(module)
+		}
+
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func contextWithApp(ctx context.Context, app core.App) context.Context {
+	return context.WithValue(ctx, appContextKey, app)
 }

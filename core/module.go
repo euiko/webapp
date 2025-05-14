@@ -1,7 +1,8 @@
-package api
+package core
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/euiko/webapp/settings"
 	"github.com/spf13/cobra"
@@ -13,9 +14,21 @@ type (
 		Close() error
 	}
 
-	ModuleFactory func() Module
+	ModuleFactory func(App) Module
 
 	ModuleOption func(*module)
+
+	CliModule interface {
+		Command(cmd *cobra.Command)
+	}
+
+	ServiceModule interface {
+		Route(router Router)
+	}
+
+	APIServiceModule interface {
+		APIRoute(router Router)
+	}
 
 	module struct {
 		settings           *settings.Settings
@@ -27,6 +40,39 @@ type (
 		cliFunc            func(cmd *cobra.Command, s *settings.Settings)
 	}
 )
+
+func GetModule[T any](app App) (T, bool) {
+	for _, module := range app.Modules() {
+		if module, ok := module.(T); ok {
+			return module, true
+		}
+	}
+
+	var zero T
+	return zero, false
+}
+
+func MustGetModule[T any](app App) T {
+	module, ok := GetModule[T](app)
+	if !ok {
+		// use zero value to help print the types
+		var t T
+		panic(fmt.Sprintf("%T module not found", t))
+	}
+
+	return module
+}
+
+func GetAllModules[T any](app App) []T {
+	var modules []T
+	for _, module := range app.Modules() {
+		if m, ok := module.(T); ok {
+			modules = append(modules, m)
+		}
+	}
+
+	return modules
+}
 
 func ModuleWithInit(f func(context.Context, *settings.Settings) error) ModuleOption {
 	return func(m *module) {

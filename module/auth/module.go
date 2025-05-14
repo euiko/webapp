@@ -2,48 +2,60 @@ package auth
 
 import (
 	"context"
+	"net/http"
 	"time"
 
-	"github.com/euiko/webapp/api"
+	"github.com/euiko/webapp/core"
 	"github.com/euiko/webapp/db/cache"
 	"github.com/euiko/webapp/pkg/helper"
 	"github.com/euiko/webapp/pkg/log"
 	"github.com/euiko/webapp/pkg/token"
 	"github.com/euiko/webapp/settings"
+
+	"github.com/euiko/webapp/module/auth/lib"
 )
 
 type (
-	Module[User Tokenable] struct {
-		settings      Settings
-		tokenEncoding token.Encoding
-		userLoader    UserLoader[User]
-		hooks         []Hook[User]
-		keyStore      token.KeyStore
+	Module[U lib.User] struct {
+		app                 core.App
+		settings            Settings
+		tokenEncoding       token.Encoding
+		userLoader          lib.UserLoader[U]
+		hooks               []lib.Hook[U]
+		keyStore            token.KeyStore
+		middleware          func(http.Handler) http.Handler
+		unauthorizedHandler http.Handler
 	}
 
-	Tokenable interface {
-		Subject() string
-	}
+	ModuleOption[U lib.User] func(*Module[U])
 )
 
 const (
 	cacheKeyKeys = "auth:keys"
 )
 
-func ModuleFactory[User Tokenable](
-	userLoader UserLoader[User],
-	hooks ...Hook[User],
-) func() api.Module {
-	return func() api.Module {
-		return NewModule[User](userLoader)
+func WithUnauthorizedHandler[U lib.User](handler http.Handler) ModuleOption[U] {
+	return func(m *Module[U]) {
+		m.unauthorizedHandler = handler
 	}
 }
 
-func NewModule[User Tokenable](
-	userLoader UserLoader[User],
-	hooks ...Hook[User],
-) *Module[User] {
-	return &Module[User]{
+func ModuleFactory[U lib.User](
+	userLoader lib.UserLoader[U],
+	options ...ModuleOption[U],
+) core.ModuleFactory {
+	return func(app core.App) core.Module {
+		return NewModule[U](app, userLoader, options...)
+	}
+}
+
+func NewModule[U lib.User](
+	app core.App,
+	userLoader lib.UserLoader[U],
+	options ...ModuleOption[U],
+) *Module[U] {
+	m := Module[U]{
+		app: app,
 		settings: Settings{
 			Enabled: false,
 			TokenEncoding: TokenEncodingSettings{
@@ -60,13 +72,19 @@ func NewModule[User Tokenable](
 		tokenEncoding: nil,
 		userLoader:    userLoader,
 	}
+
+	for _, opt := range options {
+		opt(&m)
+	}
+
+	return &m
 }
 
-func (m *Module[User]) DefaultSettings(s *settings.Settings) {
+func (m *Module[U]) DefaultSettings(s *settings.Settings) {
 	s.SetExtra("auth", &m.settings)
 }
 
-func (m *Module[User]) Init(ctx context.Context, s *settings.Settings) error {
+func (m *Module[U]) Init(ctx context.Context, s *settings.Settings) error {
 	if !m.settings.Enabled {
 		return nil
 	}
@@ -85,11 +103,11 @@ func (m *Module[User]) Init(ctx context.Context, s *settings.Settings) error {
 	return nil
 }
 
-func (m *Module[User]) Close() error {
+func (m *Module[U]) Close() error {
 	return nil
 }
 
-func (m *Module[User]) getKeys() []token.Key {
+func (m *Module[U]) GetKeys() []token.Key {
 	cached, err := cache.InMemory().Get(cacheKeyKeys)
 	if err == cache.ErrKeyNotFound {
 		keys := m.keyStore.Keys()
@@ -103,4 +121,20 @@ func (m *Module[User]) getKeys() []token.Key {
 	}
 
 	return cached.([]token.Key)
+}
+
+func (m *Module[U]) TokenEncoding() token.Encoding {
+	return m.tokenEncoding
+}
+
+func (m *Module[U]) UserLoader() lib.UserLoader[lib.User] {
+	return wrapUserLoader(m.userLoader)
+}
+
+func (m *Module[U]) Middleware() core.MiddlewareFunc {
+	if m.middleware == nil {
+		m.middleware = newMiddleware(m, nil)
+	}
+
+	return m.middleware
 }

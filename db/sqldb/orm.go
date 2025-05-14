@@ -3,6 +3,7 @@ package sqldb
 import (
 	"database/sql"
 	"errors"
+	"time"
 
 	"github.com/euiko/webapp/pkg/log"
 	"github.com/euiko/webapp/settings"
@@ -14,7 +15,15 @@ import (
 )
 
 type (
+	BaseSchema struct {
+		ID        int64     `bun:"id,pk,autoincrement"`
+		CreatedAt time.Time `bun:"created_at,notnull,nullzero"`
+		UpdatedAt time.Time `bun:"updated_at,notnull,nullzero"`
+	}
+
 	dialectFactory func(*settings.SqlDatabase) schema.Dialect
+
+	OrmDB bun.IDB
 )
 
 var (
@@ -48,7 +57,6 @@ func ORM(names ...string) *bun.DB {
 	}
 
 	return ormInstances[name]
-
 }
 
 func RegisterORMDialect(name string, f dialectFactory) error {

@@ -10,30 +10,6 @@ type (
 	FilterFunc[T any]     func(T) bool
 )
 
-func Map[T any, E any](s Stream[T], mapFunc MapFunc[T, E]) Stream[E] {
-	return Stream[E]{
-		next: func(next Continuation[E]) {
-			s.next(func(t T) {
-				e := mapFunc(t)
-				next(e)
-			})
-		},
-	}
-}
-
-func Filter[T any](s Stream[T], filterFunc FilterFunc[T]) Stream[T] {
-	return Stream[T]{
-		next: func(next Continuation[T]) {
-			s.next(func(t T) {
-				ok := filterFunc(t)
-				if ok {
-					next(t)
-				}
-			})
-		},
-	}
-}
-
 func SliceStream[T any](s []T) Stream[T] {
 	return Stream[T]{
 		next: func(next Continuation[T]) {
@@ -52,4 +28,12 @@ func ChanStream[T any](c <-chan T) Stream[T] {
 			}
 		},
 	}
+}
+
+func CollectSlice[T any](s Stream[T]) []T {
+	var result []T
+	s.next(func(t T) {
+		result = append(result, t)
+	})
+	return result
 }

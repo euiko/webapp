@@ -5,25 +5,27 @@ import (
 	"io"
 	"os"
 
-	"github.com/euiko/webapp/api"
+	"github.com/euiko/webapp/core"
 	"github.com/euiko/webapp/pkg/log"
 	"github.com/euiko/webapp/settings"
 	"github.com/spf13/cobra"
 )
 
-func Settings() api.Module {
-	return api.NewModule(api.ModuleWithCLI(func(cmd *cobra.Command, s *settings.Settings) {
+var (
+	settingsWriter = map[string]func(*settings.Settings, io.Writer) error{
+		"yaml": func(s *settings.Settings, w io.Writer) error {
+			return settings.Write(s, settings.FormatYaml, w)
+		},
+		"json": func(s *settings.Settings, w io.Writer) error {
+			return settings.Write(s, settings.FormatJson, w)
+		},
+	}
+)
+
+func Settings(app core.App) core.Module {
+	return core.NewModule(core.ModuleWithCLI(func(cmd *cobra.Command, s *settings.Settings) {
 		cmd.AddCommand(configCmd(s))
 	}))
-}
-
-var settingsWriter = map[string]func(*settings.Settings, io.Writer) error{
-	"yaml": func(s *settings.Settings, w io.Writer) error {
-		return settings.Write(s, settings.FormatYaml, w)
-	},
-	"json": func(s *settings.Settings, w io.Writer) error {
-		return settings.Write(s, settings.FormatJson, w)
-	},
 }
 
 func configCmd(s *settings.Settings) *cobra.Command {

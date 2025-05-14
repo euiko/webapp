@@ -4,8 +4,9 @@ import (
 	"errors"
 	"net/http"
 
-	"github.com/euiko/webapp/api"
+	"github.com/euiko/webapp/core"
 	"github.com/euiko/webapp/pkg/helper"
+	"github.com/euiko/webapp/pkg/session"
 )
 
 type (
@@ -19,40 +20,22 @@ type (
 	}
 )
 
-func (m *Module[User]) Route(r api.Router) {
-	// only configure when it is enabled
-	if m.settings.Enabled {
-		m.initializeMiddleware(r)
-	}
-}
-
-func (m *Module[User]) APIRoute(r api.Router) {
+func (m *Module[U]) APIRoute(r core.Router) {
 	// only configure it when it is enabled
 	if !m.settings.Enabled {
 		return
 	}
 
-	m.initializeMiddleware(r)
-
-	// add the auth middleware
-	api.PrivateRouter(r, func(r api.Router) {
-		r.Post("/auth/logout", m.logoutHandler)
-	})
+	r.With(m.Middleware()).Post("/auth/logout", m.logoutHandler)
 
 	// public accessible routes
 	r.Post("/auth/login", m.loginHandler)
 }
 
-func (m *Module[User]) initializeMiddleware(r api.Router) {
-	api.PrivateRouter(r, func(r api.Router) {
-		r.Use(m.newMiddleware(nil))
-	})
-}
-
-func (m *Module[User]) loginHandler(w http.ResponseWriter, r *http.Request) {
+func (m *Module[U]) loginHandler(w http.ResponseWriter, r *http.Request) {
 	var (
 		payload LoginPayload
-		keys    = m.getKeys()
+		keys    = m.GetKeys()
 	)
 
 	if len(keys) == 0 {
@@ -60,7 +43,7 @@ func (m *Module[User]) loginHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := helper.DecodeRequest(r, &payload); err != nil {
+	if err := helper.DecodeRequestBody(r, &payload); err != nil {
 		helper.WriteResponse(w, err)
 		return
 	}
@@ -73,19 +56,22 @@ func (m *Module[User]) loginHandler(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	user, err := m.userLoader.LoadUser(payload.LoginId, payload.Password)
+	user, err := m.userLoader.LoadUser(r.Context(), payload.LoginId, payload.Password)
 	if err != nil {
 		helper.WriteResponse(w, err)
 		return
 	}
 
-	subject := (*user).Subject()
+	subject := user.LoginID()
 	key := keys[0] // use the first key to create token
 	token, err := m.tokenEncoding.Encode(key, subject, "webapp")
 	if err != nil {
 		helper.WriteResponse(w, err)
 		return
 	}
+
+	// write into session
+	defer session.Add(r.Context(), "user", &user)
 
 	// call after login hooks
 	tokenStr := string(token)
@@ -102,7 +88,7 @@ func (m *Module[User]) loginHandler(w http.ResponseWriter, r *http.Request) {
 	helper.WriteResponse(w, response)
 }
 
-func (m *Module[User]) logoutHandler(w http.ResponseWriter, r *http.Request) {
+func (m *Module[U]) logoutHandler(w http.ResponseWriter, r *http.Request) {
 	if !IsAuthenticated(r.Context()) {
 		helper.WriteResponse(w, errors.New("not authenticated"))
 		return
